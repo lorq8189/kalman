@@ -23,36 +23,26 @@ using std::endl;
 
 using Eigen::MatrixXd;
 using Eigen::RowVectorXd;
+using Eigen::VectorXd;
 
 class Filter {
 
     public:
     
-    void mainLoop(vector<double> measures, vector<double> controls, int n);
+    void mainLoop(int n);
 
     Filter(int dimensions[], int inputMap[], vector<double> initial);
-
-
-
-
-
-
-
-
-
-
-
     
 
     int dm;
 
     int m;
 
-    vector<RowVectorXd > x;  //estimate in present
+    vector<VectorXd > x;  //estimate in present
 
-    vector<RowVectorXd> xest; //state estimates for next step
+    vector<VectorXd> xest; //state estimates for next step
 
-    vector<RowVectorXd> Y; //state measurements
+    vector<VectorXd> Y; //state measurements
 
     MatrixXd H; //sensor matrix, adjust once you have specifics
 

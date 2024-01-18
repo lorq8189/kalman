@@ -1,6 +1,6 @@
 #include <cstdio>
 //#include <eigen3/Eigen/src/Core/Matrix.h>
-//#include <eigen3/Eigen/src/Core/Matrix.h>
+
 #include <iostream>
 #include <fstream>
 #include <random>
@@ -18,66 +18,83 @@ using std::vector;
 using std::endl;
 
 using Eigen::MatrixXd;
-
+using Eigen::VectorXd;
 
 
 int main(int argc, char** argv ) {
 
-
+    argc++;
     ifstream measures;
     ifstream controls;
+    ofstream out;
+    ofstream preout;
     measures.open(argv[1]);
     controls.open(argv[2]);
-    ofstream out;
-    out.open("values.txt"); //change to csv later on
-    ofstream preout;
+    out.open("est.txt"); //change to csv later on
     preout.open("predictions.txt");
 
     //set of inputs: 0-2: all positions 3-8: all velocities and accelerations, same pattern
     //9-
-    int dm = 18;  //dimension count, can change for later
+    int dm = 3;  //dimension count, can change for later
 
-    int m = 8;
+    int m = 1;
 
     std::default_random_engine rgen;
     std::normal_distribution<double> normal(0,1); //setting up random normal
 
-    out << m << std::endl;
+    //cout << m << std::endl;
 
-    int a[] = {18, 8};
-    int b[] = {0}; //set this up
-    vector<double> c;
+    int a[] = {3, 1}; //changed temporarily for testing
+    int b[] = {2}; //set this up
+    vector<double> c = {0,0,0};
     
 
     Filter f_nep(a, b, c);
+    (f_nep.Y).push_back(VectorXd(m));
+    (f_nep.U).push_back(VectorXd(m));
+    for (int j=0; j<m; j++) {
+        f_nep.Y[0](j) = 0;
+        f_nep.U[0](j) = 0;
+    }
 
     int n = 1;
     string line;
     string line2;
+
     while (std::getline(measures, line) && std::getline(controls, line2)) {
+
+        cout << line << endl << line2 << endl;
         std::istringstream iss(line);
         std::istringstream iss2(line2);
 
         string word;
         int i=0;
+        (f_nep.Y).push_back(VectorXd(m));
+        (f_nep.U).push_back(VectorXd(m));
         while(iss >> word)          //measurements into Y[n]
+        {
+            cout << "scanning in element " << word << endl;
             f_nep.Y[n](i++) = stod(word);
+        }
         i = 0;
         while(iss2 >> word)         //controls into U[n]
             f_nep.U[n](i++) = stod(word);
+        //cout << f_nep.Y[n] << "    " << f_nep.U[n] << endl;
 
         f_nep.mainLoop(n);
 
         //below part is printing the values at each spot: completely optional and not entirely set up.
-        out << "  Estimates for time " << ++n << ":   ";
+        out << "  Estimates for time " << n << ":   ";
         for (int i=0; i<dm; i++)
-            out << f_nep.x[i] << ", ";//write estimates to file here
+            out << f_nep.x[n](i) << ", ";//write estimates to file here
         out << endl;
 
         preout << " Predictions for time " << n << ":   ";
         for (int i=0; i<dm; i++)
-            preout << f_nep.xest[n] << ", ";//write predictions to file here
+            preout << f_nep.xest[n](i) << ", ";//write predictions to file here
         preout << endl;
+        
+        n++;
     }
     return 0;
 }

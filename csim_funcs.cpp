@@ -1,5 +1,6 @@
 #include <cstdio>
-//#include <eigen3/Eigen/src/Core/Matrix.h>
+
+//#include <Eigen/StdVector>
 
 #include <iostream>
 #include <fstream>
@@ -18,6 +19,7 @@ using std::vector;
 using std::endl;
 
 using Eigen::MatrixXd;
+using Eigen::Matrix3d;
 using Eigen::RowVectorXd;
 
 Filter::Filter(int dimensions[], int inputMap[], vector<double> initial)
@@ -26,28 +28,46 @@ Filter::Filter(int dimensions[], int inputMap[], vector<double> initial)
     dm = dimensions[0];
     m = dimensions[1];
 
-    x[0] = VectorXd(dm);  //estimate in present
+    //x[0] = new VectorXd(dm);  //estimate in present
+    x.push_back(VectorXd(dm));
+    xest.push_back(VectorXd(dm));
     for (int i=0; i<initial.size(); i++)
     {
-        x[0][i] = initial[i];
-        xest[0][i] = initial[i];
-        Y[0][i] = initial[i];
+        x[0](i) = initial[i];
+        // xest[0][i] = initial[i];
+        // Y[0][i] = initial[i];
     }
 
-    
-    MatrixXd A; //set state update matrix (A) here
+    Eigen::Matrix3d a {{1,1,.5},
+                    {0,1,1},
+                    {0,0,1}};
 
-    MatrixXd B; //set control input matrix (B) here
+    A = a; //set state update matrix (A) here
 
-    MatrixXd H; //sensor matrix, set once you have specifics
+    Eigen::Vector3d b {.5,1,1};
+    B = b; //set control input matrix (B) here
+
+    Eigen::RowVector3d c = {0,0,1};
+    H = c; //state -> measure matrix
     //H turns an x estimate format (dm x 1) to a y format (m x 1), so H is (m x dm)
     //takes a state prediction and turns it into what the sensors should get if that were the true state
 
-    MatrixXd Q; //covariance matrix for B (quoting aaren)
+    cout << A << "\n\n";
 
-    vector<MatrixXd> P;  //covariance matrix (we dont set this initially?)
+// std::vector<Matrix<double,4,1>, Eigen::aligned_allocator<Matrix<double,4,1> > >
+    K.push_back(MatrixXd::Zero(dm,m));
 
-    vector<MatrixXd> R;  //covariance matrix for noise of sensors
+    Eigen::Matrix3d p {{1,0,0},
+                    {0,1,0},
+                    {0,0,.0025}};
+    P.push_back(MatrixXd(3,3));  //covariance matrix (we dont set this initially?)
+    P[0] = p;
+
+    Q = MatrixXd::Identity(dm, dm)*.0025; //covariance matrix for B (quoting aaren)
+
+    //cout << Q << endl;
+
+    R = MatrixXd::Identity(m, m)*.0025;  //covariance matrix for noise of sensors
 
     I = MatrixXd::Identity(dm, dm);
 
@@ -67,35 +87,40 @@ void Filter::mainLoop(int n)
     //for iteration n: predicts xest[n], then generates values for x[n], K[n], P[n] using n-1 data and xest[n]
     //calculates x[n] with xest[n], Previous K, and current Y
 
-    //setup U and Y, controls and measurements
-
-
 
     std::default_random_engine rgen;
     std::normal_distribution<double> normal(0,1); //setting up random normal
-    VectorXd q;
+    VectorXd q(dm);
 
     for (int i=0; i<dm; i++)
-        q[i] = normal(rgen)*Q(i,i); //setting up q, might need to change later if assuming Q is non-diagonal (probably not actually)
-
+        q(i) = normal(rgen)*Q(i,i); //setting up q, might need to change later if assuming Q is non-diagonal (probably not actually)
+    //cout << q << endl;
+    xest.push_back(VectorXd(dm));
+    //cout << A << B << x[n-1] << U[n-1];
     xest[n] = A*x[n-1] + B*U[n-1] + q; //        q? whats q??? apparently q is just the output from an N(0, Q) (vector?)
         //estimates for this state, n given n-1
         // possibly change to being Xest(n|n-1) and at the beginning of the loop instead (this change was made)
 
-
+    x.push_back(VectorXd(dm));
+    cout << (Y[n] - H*xest[n]) << K[n-1] << endl;
     x[n] = xest[n] + K[n-1]*(Y[n] - H*xest[n]); //change Y[n-1] to Y[n]? (this change was made)
 
-
+    PriorCov.push_back(MatrixXd(dm,dm));
+    cout << "h\n";
     PriorCov[n-1] = (A*P[n-1]*A.transpose() + Q); //Prior covariance, using P(n-1)
         
     //new Kalman Gain for next step 
     // K(n+1)
-    K[n] = PriorCov[n-1] * H.transpose() * (H*PriorCov[n-1]*H.transpose() + R).inverse();
+    K.push_back(MatrixXd(dm,dm));
+    MatrixXd K1 = PriorCov[n-1] * H.transpose();
+    K[n] = K1 * (H*PriorCov[n-1]*H.transpose() + R).inverse();
 
 
     //updating Covariance Matrix for next step (posterior estimation)
     // P(n+1)
+    BasisChange.push_back(MatrixXd(dm,dm));
     BasisChange[n-1] = I-K[n-1]*H; 
+    P.push_back(MatrixXd(dm,dm));
     P[n] = BasisChange[n-1] * PriorCov[n-1] * BasisChange[n-1].transpose() + K[n-1]*R*(K[n-1]).transpose();
 
     

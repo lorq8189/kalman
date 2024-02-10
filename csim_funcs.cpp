@@ -22,16 +22,17 @@ using Eigen::MatrixXd;
 using Eigen::Matrix3d;
 using Eigen::RowVectorXd;
 
-Filter::Filter(int dimensions[], int inputMap[], vector<double> initial)
+Filter::Filter(int dimensions[], vector<double> initial)
 {
 
     dm = dimensions[0];
     m = dimensions[1];
+    u = dimensions[2];
 
     //x[0] = new VectorXd(dm);  //estimate in present
     x.push_back(VectorXd(dm));
     xest.push_back(VectorXd(dm));
-    for (int i=0; i<initial.size(); i++)
+    for (int i=0; i<(int)initial.size(); i++)
     {
         x[0](i) = initial[i];
         // xest[0][i] = initial[i];
@@ -47,12 +48,12 @@ Filter::Filter(int dimensions[], int inputMap[], vector<double> initial)
     Eigen::Vector3d b {.5,1,1};
     B = b; //set control input matrix (B) here
 
-    Eigen::RowVector3d c = {0,0,1};
-    H = c; //state -> measure matrix
+    Eigen::RowVector3d h = {0,0,1};
+    H = h; //state -> measure matrix
     //H turns an x estimate format (dm x 1) to a y format (m x 1), so H is (m x dm)
     //takes a state prediction and turns it into what the sensors should get if that were the true state
 
-    cout << A << "\n\n";
+    //cout << A << "\n\n";
 
 // std::vector<Matrix<double,4,1>, Eigen::aligned_allocator<Matrix<double,4,1> > >
     K.push_back(MatrixXd::Zero(dm,m));
@@ -73,7 +74,8 @@ Filter::Filter(int dimensions[], int inputMap[], vector<double> initial)
 
     vector<MatrixXd> PriorCov;
 
-    vector<MatrixXd> BasisChange;
+    BasisChange.push_back(MatrixXd(dm,dm));
+
 
     //for above two matrices, notation BasisChange[n] means the BasisChange matrix USING data from step n, and the matrix is used in step n+1
 
@@ -88,25 +90,15 @@ void Filter::mainLoop(int n)
     //calculates x[n] with xest[n], Previous K, and current Y
 
 
-    std::default_random_engine rgen;
-    std::normal_distribution<double> normal(0,1); //setting up random normal
-    VectorXd q(dm);
-
-    for (int i=0; i<dm; i++)
-        q(i) = normal(rgen)*Q(i,i); //setting up q, might need to change later if assuming Q is non-diagonal (probably not actually)
-    //cout << q << endl;
+   
     xest.push_back(VectorXd(dm));
     //cout << A << B << x[n-1] << U[n-1];
-    xest[n] = A*x[n-1] + B*U[n-1] + q; //        q? whats q??? apparently q is just the output from an N(0, Q) (vector?)
+    xest[n] = A*x[n-1] + B*U[n-1]; //        q? whats q??? apparently q is just the output from an N(0, Q) (vector?)
         //estimates for this state, n given n-1
         // possibly change to being Xest(n|n-1) and at the beginning of the loop instead (this change was made)
 
-    x.push_back(VectorXd(dm));
-    cout << (Y[n] - H*xest[n]) << K[n-1] << endl;
-    x[n] = xest[n] + K[n-1]*(Y[n] - H*xest[n]); //change Y[n-1] to Y[n]? (this change was made)
-
+    
     PriorCov.push_back(MatrixXd(dm,dm));
-    cout << "h\n";
     PriorCov[n-1] = (A*P[n-1]*A.transpose() + Q); //Prior covariance, using P(n-1)
         
     //new Kalman Gain for next step 
@@ -119,10 +111,14 @@ void Filter::mainLoop(int n)
     //updating Covariance Matrix for next step (posterior estimation)
     // P(n+1)
     BasisChange.push_back(MatrixXd(dm,dm));
-    BasisChange[n-1] = I-K[n-1]*H; 
+    BasisChange[n] = I-K[n]*H; 
     P.push_back(MatrixXd(dm,dm));
-    P[n] = BasisChange[n-1] * PriorCov[n-1] * BasisChange[n-1].transpose() + K[n-1]*R*(K[n-1]).transpose();
+    P[n] = BasisChange[n] * PriorCov[n-1] * BasisChange[n].transpose() + K[n]*R*(K[n]).transpose();
 
+
+    x.push_back(VectorXd(dm));
+    //cout << (Y[n] - H*xest[n]) << K[n-1] << endl;
+    x[n] = xest[n] + K[n]*(Y[n] - H*xest[n]); //change Y[n-1] to Y[n]? (this change was made)
     
 }
 

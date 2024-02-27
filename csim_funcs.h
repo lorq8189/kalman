@@ -33,12 +33,14 @@ class Filter {
     
     void mainLoop(int n);
 
-    Filter(int dimensions[], int inputMap[], vector<double> initial);
+    Filter(int dimensions[], vector<double> initial);
     
 
     int dm;
 
     int m;
+    
+    int u;
 
     vector<VectorXd, Eigen::aligned_allocator<VectorXd> > x;  //estimate in present
 

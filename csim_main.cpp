@@ -36,44 +36,42 @@ int main(int argc, char** argv ) {
     //set of inputs: 0-2: all positions 3-8: all velocities and accelerations, same pattern
     //9-
     int dm = 3;  //dimension count, can change for later
-
     int m = 1;
+    int u = 1;
 
     std::default_random_engine rgen;
     std::normal_distribution<double> normal(0,1); //setting up random normal
 
-    //cout << m << std::endl;
-
-    int a[] = {3, 1}; //changed temporarily for testing
-    int b[] = {2}; //set this up
-    vector<double> c = {0,0,0};
+    int a[] = {dm, m, u}; //list of dimensions
+    vector<double> initial = {0,0,1};
     
-
-    Filter f_nep(a, b, c);
+    Filter f_nep(a, initial);
     (f_nep.Y).push_back(VectorXd(m));
-    (f_nep.U).push_back(VectorXd(m));
-    for (int j=0; j<m; j++) {
+    (f_nep.U).push_back(VectorXd(u));
+    for (int j=0; j<m; j++) 
         f_nep.Y[0](j) = 0;
+    for (int j=0; j<u; j++) 
         f_nep.U[0](j) = 0;
-    }
 
     int n = 1;
     string line;
     string line2;
 
+    out << "Format:              Position | Velocity | Acceleration\n";
+
     while (std::getline(measures, line) && std::getline(controls, line2)) {
 
-        cout << line << endl << line2 << endl;
+        //cout << line << endl << line2 << endl;
         std::istringstream iss(line);
         std::istringstream iss2(line2);
-
         string word;
         int i=0;
         (f_nep.Y).push_back(VectorXd(m));
-        (f_nep.U).push_back(VectorXd(m));
+        (f_nep.U).push_back(VectorXd(u));
+
         while(iss >> word)          //measurements into Y[n]
         {
-            cout << "scanning in element " << word << endl;
+            //cout << "scanning in element " << word << endl;
             f_nep.Y[n](i++) = stod(word);
         }
         i = 0;
@@ -81,15 +79,16 @@ int main(int argc, char** argv ) {
             f_nep.U[n](i++) = stod(word);
         //cout << f_nep.Y[n] << "    " << f_nep.U[n] << endl;
 
+
         f_nep.mainLoop(n);
 
+
         //below part is printing the values at each spot: completely optional and not entirely set up.
-        out << "  Estimates for time " << n << ":   ";
+        out << "Estimates for time " << n << ":   ";
         for (int i=0; i<dm; i++)
             out << f_nep.x[n](i) << ", ";//write estimates to file here
         out << endl;
-
-        preout << " Predictions for time " << n << ":   ";
+        preout << "Predictions for time " << n << ":   ";
         for (int i=0; i<dm; i++)
             preout << f_nep.xest[n](i) << ", ";//write predictions to file here
         preout << endl;
@@ -165,3 +164,13 @@ int main(int argc, char** argv ) {
     // vector<MatrixXd> PriorCov(dm, dm);
 
     // vector<MatrixXd> BasisChange(dm, dm);
+
+
+
+    //  std::default_random_engine rgen;
+    // std::normal_distribution<double> normal(0,1); //setting up random normal
+    // VectorXd q(dm);
+    // for (int i=0; i<dm; i++)
+    //     q(i) = normal(rgen)*Q(i,i); //setting up q, might need to change later if assuming Q is non-diagonal (probably not actually)
+    
+    //cout << q << endl;
